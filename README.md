@@ -27,12 +27,12 @@ To get started with using or contributing to this repository, follow these steps
 
 3. Open the HTML file in a web browser to interact with and explore the interactive chart.
 
-##Usage
+## Usage
 Each chart type has its own directory and associated HTML and JavaScript files. You can modify the HTML, JavaScript, and CSS to customize the appearance and behavior of the charts. The charts are built using the Fabric.js library for canvas rendering.
 
 Feel free to experiment, tweak parameters, and enhance the code to suit your needs.
 
-##Chart Types
+## Chart Types
 This repository includes code for the following interactive chart types:
 
 Line Chart: Create line charts on virtual graph paper.
@@ -40,8 +40,8 @@ Bar Chart: Build dynamic bar charts to visualize data.
 Venn Chart : Build Movable venn diagrams.
 Pie chart : Pie chart with protractor and ruler.
 
-##Contributing
+## Contributing
 Contributions are welcome! If you'd like to contribute to this repository, feel free to open issues, submit pull requests, or suggest improvements. Please follow the existing code style and guidelines when submitting contributions.
 
-##License
+## License
 This project is licensed under the MIT License. Feel free to use and modify the code for your own projects.
