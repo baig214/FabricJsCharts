@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Interactive Line Chart on Virtual Graph Paper</title>
+
+    <style>
+        body {
+            margin: 20;
+            padding: 0;
+
+        }
+
+        #canvas {
+            border: 1px solid black;
+            cursor: crosshair;
+            margin-left: 30%;
+            margin-top: 20px;
+        }
+
+
+        .upper-canvas {
+            cursor: crosshair;
+        }
+    </style>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/4.5.0/fabric.min.js"></script>
+
+</head>
+
+<body>
+
+    <div style="position: relative;">
+
+        <div>
+            <label for="numColumns">Number of Columns:</label>
+            <input type="number" id="numColumns" value="10">
+            <label for="minYValue">Minimum Y-Axis Value:</label>
+            <input type="number" id="minYValue" value="0" disabled>
+            <label for="maxYValue">Maximum Y-Axis Value:</label>
+            <input type="number" id="maxYValue" value="60">
+            <label for="numIntervals">Number of Intervals for Y-Axis:</label>
+            <input type="number" id="numIntervals" value="6" step="any">
+            <button onclick="generateGraph()">Generate </button>
+            <button id="toggleModeButton" onclick="toggleMode()">Toggle Edit Mode</button>
+            <button onclick="undoLine()">Undo</button>
+            <button onclick="redoLine()">Redo</button>
+
+            <button onclick="saveAsImage()">Save as Image</button>
+        </div>
+
+        <canvas id="graphCanvas" width="2000" height="1500" style="border: 1px solid #000;position: absolute;"></canvas>
+    </div>
+    <script>
+        var canvas = new fabric.Canvas('graphCanvas');
+        var gridSize = 50;
+        var numDivisions = 5;
+        var lines = [];
+        var startPoint = null;
+        var undoneLines = [];
+        let previousEndPoint = null;
+        var tempPointCircle;
+        var newLinesDrawn = false;
+        var editMode = false; // Initially, set to Draw Mode
+        var canvasStates = [];
+
+        function generateGraph() {
+            canvas.clear();
+            var numColumns = parseInt(document.getElementById('numColumns').value);
+            var maxYValue = parseInt(document.getElementById('maxYValue').value);
+            var minYValue = parseInt(document.getElementById('minYValue').value);
+            var numIntervals = parseFloat(document.getElementById('numIntervals').value);
+            var numGridsY = Math.ceil((maxYValue - minYValue) / numIntervals) + 1;
+            var numGridsX = Math.max(numColumns + 1, 5);
+            var numGrids = Math.max(numGridsX, numGridsY) + 2;
+            var canvasWidth = (numColumns + 2) * gridSize;
+            var newCanvasHeight = numGrids * gridSize;
+            let lines = [];
+
+            canvas.setWidth(canvasWidth);
+            canvas.setHeight(newCanvasHeight);
+
+            for (var i = 0; i <= numGrids; i++) {
+                for (var j = 0; j <= numColumns + 2; j++) {
+                    var x = j * gridSize;
+                    var y = i * gridSize;
+                    var horizontalLine = new fabric.Line([x, y, x + gridSize, y], {
+                        stroke: '#ccc', //change the color to change the division color
+                        selectable: false
+                    });
+                    canvas.add(horizontalLine);
+                    var verticalLine = new fabric.Line([x, y, x, y + gridSize], {
+                        stroke: '#ccc', //change the color to change the division color
+                        selectable: false
+                    });
+                    canvas.add(verticalLine);
+                    for (var k = 1; k < numDivisions; k++) {
+                        var divisionX = x + k * (gridSize / numDivisions);
+                        var divisionY = y + k * (gridSize / numDivisions);
+                        var divisionLineX = new fabric.Line([divisionX, y, divisionX, y + gridSize], {
+                            stroke: '#ddd',
+                            selectable: false
+                        });
+                        var divisionLineY = new fabric.Line([x, divisionY, x + gridSize, divisionY], {
+                            stroke: '#ddd',
+                            selectable: false
+                        });
+                        canvas.add(divisionLineX, divisionLineY);
+                    }
+                }
+            }
+            drawAxesWithLabels(numColumns, maxYValue, minYValue, numIntervals);
+            createTopRightBox();
+            setupClickEvents();
+        }
+
+        function toggleMode() {
+    editMode = !editMode; // Toggle the mode flag
+    if (editMode) {
+        canvas.isDrawingMode = false; // Disable drawing mode
+    }
+    canvas.forEachObject(function (obj) {
+        if (obj.isType('i-text')) {
+            obj.selectable = editMode; // Enable/disable text editing
+        }
+    });
+}
+
+
+        function drawAxesWithLabels(numColumns, maxYValue, minYValue, numIntervals) {
+            var xAxis = new fabric.Line([0, canvas.height - gridSize, canvas.width, canvas.height - gridSize], {
+                stroke: '#000',
+                strokeWidth: 2,
+                selectable: false
+            });
+            canvas.add(xAxis);
+            var yAxis = new fabric.Line([gridSize, 0, gridSize, canvas.height], {
+                stroke: '#000',
+                strokeWidth: 2,
+                selectable: false
+            });
+            canvas.add(yAxis);
+            var xLabels = [];
+            for (var i = 1; i <= numColumns; i++) {
+                xLabels.push('category' + i);
+            }
+            for (var i = 0; i < xLabels.length; i++) {
+                var xValue = xLabels[i];
+                var xPosition = gridSize + i * gridSize + 10;
+                var xLabel = new fabric.Text(xValue, {
+                    left: xPosition,
+                    top: canvas.height - gridSize + 20,
+                    fontSize: 12,
+                    selectable: true,
+                    hasControls: false,
+                    lockUniScaling: true
+                });
+                xLabel.on('selected', function () {
+                    if (editMode) {
+                    var newValue = prompt('Enter the new x-axis value:');
+                    if (newValue !== null) {
+                        this.text = newValue;
+                        canvas.renderAll();
+                    }
+                }
+                });
+                canvas.add(xLabel);
+            }
+            for (var yValue = minYValue; yValue <= maxYValue; yValue += numIntervals) {
+                var yPosition = canvas.height - gridSize - ((yValue - minYValue) * gridSize) / numIntervals;
+                var yValueText = new fabric.Text(yValue.toString(), {
+                    left: gridSize - 28,
+                    top: yPosition - 8,
+                    fontSize: 12,
+                    selectable: false
+                });
+                canvas.add(yValueText);
+            }
+        }
+
+        function createTopRightBox() {
+            var boxLabel = new fabric.Text('1 Unit =', {
+                left: canvas.width - 200,
+                top: 10,
+                fontSize: 16,
+                backgroundColor: 'white',
+                selectable: false
+            });
+
+            var inputBox = new fabric.IText('5 Divisions', {
+                left: canvas.width - 140,
+                top: gridSize - 40,
+                width: 180,
+                fontSize: 16,
+                fill: "blue",
+                textAlign: 'center',
+                borderColor: 'green',
+                backgroundColor: 'white',
+                selectable: true,
+                editable: true,
+                hasControls: false
+            });
+
+            canvas.add(boxLabel);
+            canvas.add(inputBox);
+        }
+
+        function setupClickEvents() {
+            var isDrawing = false;
+            var line;
+            // To keep track of the previous endpoint
+
+            canvas.on('mouse:down', function (options) {
+                var clickedPoint = canvas.getPointer(options.e);
+
+                if (!editMode && !isDrawing) {
+                    if (previousEndPoint) {
+                        startPoint = previousEndPoint; // Set the start point to the previous end point
+                    } else {
+                        startPoint = clickedPoint; // Set the start point to the initial click point
+                    }
+                    isDrawing = true;
+
+                    line = new fabric.Line([startPoint.x, startPoint.y, startPoint.x, startPoint.y], {
+                        stroke: 'black',
+                        strokeWidth: 2,
+                        selectable: false
+                    });
+
+
+                    canvas.add(line);
+                    
+                    var startPointCircle = new fabric.Circle({
+                        left: startPoint.x - 3,
+                        top: startPoint.y - 3,
+                        radius: 3,
+                        fill: 'red',
+                        selectable: false
+                    });
+
+                    canvas.add(startPointCircle);
+                    undoneLines.length = 0;
+
+                }
+            });
+
+            canvas.on('mouse:move', function (options) {
+                if (!editMode && isDrawing) {
+                    var movedPoint = canvas.getPointer(options.e);
+                    line.set({
+                        x2: movedPoint.x,
+                        y2: movedPoint.y,
+                        hasControls: false
+                    });
+
+                    if (tempPointCircle) {
+                        tempPointCircle.set({
+                            left: movedPoint.x - 3,
+                            top: movedPoint.y - 3
+                        });
+                    } else {
+                        tempPointCircle = new fabric.Circle({
+                            left: movedPoint.x - 3,
+                            top: movedPoint.y - 3,
+                            radius: 3,
+                            fill: 'green',
+                            selectable: false
+                        });
+                        canvas.add(tempPointCircle);
+                    }
+
+                    canvas.renderAll();
+                }
+            });
+
+
+            canvas.on('mouse:up', function (options) {
+                if (!editMode && isDrawing) {
+                    newLinesDrawn = true;
+                    var endPoint = canvas.getPointer(options.e);
+                    line.set({
+                        x2: endPoint.x,
+                        y2: endPoint.y
+                    });
+                    canvas.renderAll();
+                    lines.push({
+                        start: startPoint,
+                        end: endPoint,
+                        selectable: true
+                    });
+                    previousEndPoint = endPoint; // Update the previous end point
+                    isDrawing = false;
+                    if (tempPointCircle) {
+                        canvas.remove(tempPointCircle);
+                        tempPointCircle = null;
+                    }
+
+                    var endPointCircle = new fabric.Circle({
+                        left: endPoint.x - 3,
+                        top: endPoint.y - 3,
+                        radius: 3,
+                        fill: 'blue',
+                        selectable: false
+                    });
+
+                    canvas.add(endPointCircle);
+
+
+                }
+            });
+
+            canvas.on('object:selected', function (e) {
+                // Deselect the selected object (line)
+                canvas.discardActiveObject();
+            });
+        }
+
+        function drawLine(start, end) {
+            var line = new fabric.Line([start.x, start.y, end.x, end.y], {
+                stroke: 'black',
+                strokeWidth: 2,
+                selectable: false
+            });
+            canvas.add(line);
+            canvas.renderAll();
+          
+            newLinesDrawn = true;
+        }
+
+        function undoLine() {
+            if (lines.length > 0) {
+                canvasStates.push(canvas.toJSON());
+
+                canvas.remove(canvas.getObjects().pop());
+                canvas.remove(canvas.getObjects().pop());
+                canvas.remove(canvas.getObjects().pop());
+
+                var removedLine = lines.pop();
+                undoneLines.push(removedLine);
+                canvas.renderAll();
+              
+                // Reset previousEndPoint when undoing
+                if (lines.length > 0) {
+                    previousEndPoint = lines[lines.length - 1].end;
+                } else {
+                    previousEndPoint = null;
+                }
+                newLinesDrawn = false; 
+            }
+        }
+
+
+        function redoLine() {
+            // Redo previously undone lines if conditions are met
+            if (!newLinesDrawn && undoneLines.length > 0) {
+            if (undoneLines.length > 0) {
+                var restoredLine = undoneLines.pop();
+              
+                drawLine(restoredLine.start, restoredLine.end);
+                lines.push({
+                    start: restoredLine.start,
+                    end: restoredLine.end,
+                    selectable: false
+                });
+                previousEndPoint=restoredLine.end;
+                // Add back the start point circle
+                var startPointCircle = new fabric.Circle({
+                    left: restoredLine.start.x - 3,
+                    top: restoredLine.start.y - 3,
+                    radius: 3,
+                    fill: 'red',
+                    selectable: false
+                });
+
+                canvas.add(startPointCircle);
+
+                // Add back the end point circle
+                var endPointCircle = new fabric.Circle({
+                    left: restoredLine.end.x - 3,
+                    top: restoredLine.end.y - 3,
+                    radius: 3,
+                    fill: 'blue',
+                    selectable: false
+                });
+
+                canvas.add(endPointCircle);
+                newLinesDrawn = false;
+            }
+        }
+        }
+
+        // //function to Save the canvas as an image
+        function saveAsImage() {
+            var dataURL = canvas.toDataURL('image/jpeg');
+            var link = document.createElement('a');
+            link.download = 'graph.jpg';
+            link.href = dataURL;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+
+</html>

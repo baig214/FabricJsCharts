@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Venn Diagram Editor</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/4.5.0/fabric.min.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.0/jquery.min.js"></script>
+</head>
+<body>
+  <!-- <label for="circle-count">Enter the number of circles (2 or more):</label>
+  <input type="number" id="circle-count" min="2" value="2"> -->
+  <!-- <button id="draw-venn">Draw Venn Diagram</button> -->
+  <button id="increase-font-size">Increase Font Size</button>
+  <button id="decrease-font-size">Decrease Font Size</button>
+  <button id="undo-circle">Undo Circle</button>
+  <button id="undo-text">Undo Text</button>
+  <button id="save-image">Save as Image</button>
+  <button id="add-circle">Add Circle</button>
+  <canvas id="canvas" width="900" height="550" style="border: 1px solid black;"></canvas>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const canvas = new fabric.Canvas('canvas', { selection: false });
+      let circleCount = 2; // Default value
+      let textObjects = []; // Initialize textObjects array
+      let initialCircles = []; // Store the initial two circles separately
+      let addedCircles = []; // Store the subsequently added circles
+      
+      // document.getElementById('draw-venn').addEventListener('click', function() {
+      // //  const userInput = parseInt(document.getElementById('circle-count').value, 10);
+      //  // circleCount = Math.max(2, userInput);
+      //  // document.getElementById('circle-count').value = circleCount; // Update the input value
+     
+      //   drawVennDiagram(circleCount);
+      // });
+
+      document.getElementById('increase-font-size').addEventListener('click', function() {
+        changeFontSize(5);
+      });
+
+      document.getElementById('decrease-font-size').addEventListener('click', function() {
+        changeFontSize(-5);
+      });
+
+      document.getElementById('undo-circle').addEventListener('click', function() {
+        undoCircle();
+      });
+
+      document.getElementById('undo-text').addEventListener('click', function() {
+        undoText();
+      });
+
+      document.getElementById('save-image').addEventListener('click', function() {
+        saveAsImage();
+      });
+
+      document.getElementById('add-circle').addEventListener('click', function() {
+        addNewCircle();
+      });
+
+      $(document).ready(function() {
+        drawVennDiagram(circleCount);
+      });
+      
+      function drawVennDiagram(circleCount) {
+    canvas.clear();
+    textObjects = []; // Clear the existing textObjects array
+    addedCircles = []; // Clear the existing addedCircles array
+
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const radius = 150;
+    const circleSpacing = 150;
+
+    initialCircles = []; // Clear the existing initialCircles array
+
+    // Calculate the total width required for all circles with gaps
+    const totalWidth = circleCount * (2 * radius) + (circleCount - 1) * 10;
+
+    // Calculate the starting x-coordinate to center the circles
+    const startX = centerX - totalWidth / 2 +60;
+
+    for (let i = 0; i < circleCount; i++) {
+      // Calculate the x-coordinate for the current circle
+      const x = startX + (2 * radius + 10) * i;
+
+      // Create the circle object
+      const circle = new fabric.Circle({
+        left: x - radius,
+        top: centerY - radius,
+        radius: radius,
+        fill: 'transparent',
+        stroke: 'black',
+        strokeWidth: 2,
+        selectable: true, // Make the initial circles movable
+      });
+
+      // Check if the circle intersects with any of the initial circles
+      const intersects = initialCircles.some((initialCircle) => {
+        return circle.intersectsWithObject(initialCircle);
+      });
+
+      // If there's an intersection, adjust the position to avoid overlapping
+      if (intersects) {
+        circle.set({ left: x + radius + 10 });
+      }
+
+      canvas.add(circle);
+
+      if (i < 2) {
+        initialCircles.push(circle); // Add the circle to the initialCircles array
+      } else {
+        addedCircles.push(circle); // Add the circle to the addedCircles array
+      }
+    }
+  }
+
+      function changeFontSize(delta) {
+        const activeObject = canvas.getActiveObject();
+        if (activeObject && activeObject.type === 'text') {
+          const currentFontSize = activeObject.get('fontSize');
+          activeObject.set('fontSize', currentFontSize + delta);
+          canvas.renderAll();
+        }
+      }
+
+      canvas.on('mouse:down', function(options) {
+        if (options.target) return;
+
+        const text = prompt('Enter text:');
+        if (text) {
+          const textObject = new fabric.Text(text, {
+            left: options.pointer.x,
+            top: options.pointer.y,
+            fontSize: 20,
+            selectable: true,
+            hasControls: false,
+          });
+
+          canvas.add(textObject);
+          textObjects.push(textObject); // Add the textObject to the textObjects array
+        }
+      });
+
+      function undoCircle() {
+        if (addedCircles.length > 0) {
+          const lastCircle = addedCircles.pop();
+          canvas.remove(lastCircle);
+          canvas.renderAll();
+        }
+      }
+
+      function undoText() {
+        if (textObjects.length > 0) {
+          const lastTextObject = textObjects.pop();
+          canvas.remove(lastTextObject);
+          canvas.renderAll();
+        }
+      }
+
+      function addNewCircle() {
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        const radius = 150;
+
+        const x = Math.random() * (canvas.width - 2 * radius) + radius;
+        const y = Math.random() * (canvas.height - 2 * radius) + radius;
+
+        const circle = new fabric.Circle({
+          left: x - radius,
+          top: y - radius,
+          radius: radius,
+          fill: 'transparent',
+          stroke: 'black',
+          strokeWidth: 2,
+          selectable: true,
+        });
+
+        canvas.add(circle);
+        addedCircles.push(circle); // Add the circle to the addedCircles array
+      }
+
+      function saveAsImage() {
+        const dataURL = canvas.toDataURL({
+          format: 'png',
+          multiplier: 2,
+        });
+
+        const link = document.createElement('a');
+        link.download = 'venn_diagram.png';
+        link.href = dataURL;
+        link.click();
+      }
+    });
+  </script>
+</body>
+</html>

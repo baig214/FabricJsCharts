@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Virtual Graph Paper with Draggable Bars</title>
+    <!-- Include Fabric.js library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/4.5.0/fabric.min.js"></script>
+
+</head>
+
+<body>
+    <!-- Container for canvas and box -->
+    <div style="position: relative;">
+        <!-- Input box for user input -->
+        <div>
+            <label for="numColumns">Number of Bar Columns:</label>
+            <input type="number" id="numColumns" value="10">
+            <label for="minYValue">Minimum Y-Axis Value:</label>
+            <input type="number" id="minYValue" value="0" disabled >
+            <label for="maxYValue">Maximum Y-Axis Value:</label>
+            <input type="number" id="maxYValue" value="60">
+            <label for="numIntervals">Number of Intervals for Y-Axis:</label>
+            <input type="number" id="numIntervals" value="6" step="any">
+            <button onclick="generateGraph()">Generate Bars</button>
+            <button onclick="saveAsImage()">Save as Image</button>
+        </div>
+
+        <!-- Canvas element to draw the graph paper -->
+        <canvas id="graphCanvas" width="2000" height="1500" style="border: 1px solid #000;position: absolute;" ></canvas>
+    </div>
+    <script>
+        // Create a Fabric.js canvas
+        var canvas = new fabric.Canvas('graphCanvas');
+
+        // Global variables for the virtual graph paper
+        var gridSize = 50; // Default grid size
+        var numDivisions = 5; // 5 divisions in each grid
+
+        // Array of colors for each bar
+        var barColors = ['red', 'blue', 'green', 'orange', 'purple', 'yellow', 'brown', 'pink', 'cyan', 'gray'];
+
+        // Function to generate the graph based on user input
+        function generateGraph() {
+            // Clear the canvas
+            canvas.clear();
+
+            // Get user inputs
+            var numColumns = parseInt(document.getElementById('numColumns').value);
+            var maxYValue = parseInt(document.getElementById('maxYValue').value);
+            var minYValue = parseInt(document.getElementById('minYValue').value);
+            var numIntervals = parseFloat(document.getElementById('numIntervals').value);
+
+            // Calculate the required number of grids to accommodate the maximum y-axis value
+            var numGridsY = Math.ceil((maxYValue - minYValue) / numIntervals) + 1; // Add 1 for the intersection point
+            var numGridsX = Math.max(numColumns + 1, 5); // Ensure there are at least 5 grids in width
+            var numGrids = Math.max(numGridsX, numGridsY) + 2; // Add extra 2 grids at the top
+
+            // Calculate the width of the canvas based on the number of columns and the fixed grid size
+            var canvasWidth = (numColumns + 2) * gridSize; // Add 2 extra columns for labels
+
+            // Resize the canvas to fit the new width and the number of grids
+            var newCanvasHeight = numGrids * gridSize;
+            canvas.setWidth(canvasWidth);
+            canvas.setHeight(newCanvasHeight);
+
+            // Draw the virtual graph paper with grid lines
+            for (var i = 0; i <= numGrids; i++) {
+                for (var j = 0; j <= numColumns + 2; j++) { // Add 2 extra columns for labels
+                    var x = j * gridSize;
+                    var y = i * gridSize;
+
+                    // Draw horizontal grid lines
+                    var horizontalLine = new fabric.Line([x, y, x + gridSize, y], {
+                        stroke: '#ccc',
+                        selectable: false
+                    });
+                    canvas.add(horizontalLine);
+
+                    // Draw vertical grid lines
+                    var verticalLine = new fabric.Line([x, y, x, y + gridSize], {
+                        stroke: '#ccc',
+                        selectable: false
+                    });
+                    canvas.add(verticalLine);
+
+                    // Draw divisions
+                    for (var k = 1; k < numDivisions; k++) {
+                        var divisionX = x + k * (gridSize / numDivisions);
+                        var divisionY = y + k * (gridSize / numDivisions);
+
+                        var divisionLineX = new fabric.Line([divisionX, y, divisionX, y + gridSize], {
+                            stroke: '#ddd',
+                            selectable: false
+                        });
+                        var divisionLineY = new fabric.Line([x, divisionY, x + gridSize, divisionY], {
+                            stroke: '#ddd',
+                            selectable: false
+                        });
+
+                        canvas.add(divisionLineX, divisionLineY);
+                    }
+                }
+            }
+
+            // Draw the x-axis and y-axis with sample labels and y-axis values
+            drawAxesWithLabels(numColumns, maxYValue, minYValue, numIntervals);
+            let maxVal = maxYValue - minYValue;
+
+            // Draw the fixed bars
+            drawFixedBars(numColumns, maxVal, numIntervals);
+            // Call the function to create the topRightBox
+            createTopRightBox();
+        }
+
+        // Function to draw x-axis and y-axis on the grid with sample labels and y-axis values
+        function drawAxesWithLabels(numColumns, maxYValue, minYValue, numIntervals) {
+            // Draw x-axis at the bottom of the last grid
+            var xAxis = new fabric.Line([0, canvas.height - gridSize, canvas.width, canvas.height - gridSize], {
+                stroke: '#000',
+                strokeWidth: 2,
+                selectable: false
+            });
+            canvas.add(xAxis);
+
+            // Draw y-axis on the left side of the last grid
+            var yAxis = new fabric.Line([gridSize, 0, gridSize, canvas.height], {
+                stroke: '#000',
+                strokeWidth: 2,
+                selectable: false
+            });
+            canvas.add(yAxis);
+
+            // Add sample labels on x-axis and y-axis
+            var xLabels = [];
+            for (var i = 1; i <= numColumns; i++) {
+                xLabels.push('category' + i);
+            }
+
+            // Draw x-axis category labels
+            for (var i = 0; i < xLabels.length; i++) {
+                var xValue = xLabels[i];
+                var xPosition = gridSize + i * gridSize + 10;
+
+                var xLabel = new fabric.Text(xValue, {
+                    left: xPosition, // Align the label with the bar
+                    top: canvas.height - gridSize + 20, // Adjust the position below the x-axis
+                    fontSize: 12,
+                    selectable: true, // Enable editing the label
+                    hasControls: false, // Hide the bounding box when editing
+                    lockUniScaling: true // Lock scaling to maintain label aspect ratio
+                });
+
+                // On click of the x-axis label, show a prompt to edit
+                xLabel.on('selected', function () {
+                    var newValue = prompt('Enter the new x-axis value:');
+                    if (newValue !== null) {
+                        this.text = newValue;
+                        canvas.renderAll();
+                    }
+                });
+
+                canvas.add(xLabel);
+            }
+
+            // Add y-axis values (place values based on the number of intervals)
+            for (var yValue = minYValue; yValue <= maxYValue; yValue += numIntervals) {
+                var yPosition = canvas.height - gridSize - ((yValue - minYValue) * gridSize) / numIntervals;
+
+                var yValueText = new fabric.Text(yValue.toString(), {
+                    left: gridSize - 28,
+                    top: yPosition - 8,
+                    fontSize: 12,
+                    selectable: false
+                });
+
+                canvas.add(yValueText);
+            }
+        }
+
+        // Function to draw fixed bars on the x-axis with sample x-axis values
+        function drawFixedBars(numColumns, maxYValue, numIntervals) {
+            var xLabels = [];
+            for (var i = 1; i <= numColumns; i++) {
+                xLabels.push('category' + i);
+            }
+
+            // Calculate the width of each bar and gap between them based on the number of columns and available space
+            var totalGapWidth = (canvas.width - 2 * gridSize) * 0.03; // 5% of the total width for the gap
+            var availableWidth = canvas.width - 2 * gridSize - totalGapWidth * (numColumns - 1);
+            var barWidth = availableWidth / numColumns;
+             // Calculate the initial height of the bar based on the maximum y-axis value
+             var initialBarHeight = (maxYValue * gridSize) / numIntervals;
+            for (var i = 0; i < xLabels.length; i++) {
+                var xValue = xLabels[i];
+                var xPosition = gridSize + i * (barWidth + totalGapWidth) + (barWidth / 2) + 10;
+
+               
+
+                // Draw the bar as a rectangle with fixed x-axis position and vertical scaling enabled
+                var bar = new fabric.Rect({
+                    left: xPosition - barWidth / 2, // Adjust position to center the bar
+                    top: canvas.height - gridSize - initialBarHeight,
+                    width: barWidth,
+                    height: initialBarHeight,
+                    fill: barColors[i % barColors.length], // Assign different color for each bar
+                    selectable: true, // Enable scaling for the bar
+                    lockMovementX: true,// Lock horizontal movement
+                    lockMovementY: true, // Lock vertical movement
+                    lockScalingX: true, // Lock scaling in the x-direction
+                    lockScalingFlip: true,
+                   // lockSkewingY: true,
+                    hasControls: true,
+                    lockUniScaling: true,
+                    minScaleLimit:0,
+                    lockRotation: true // Lock rotation to maintain horizontal orientation
+                });
+
+
+                // Set the minimum height of the bar to keep it above the x-axis line and bottom two grids
+                bar.on('scaling', function (e) {
+                    var newHeight = this.height;// * this.scaleY;
+                    var yPosition = this.top + newHeight;
+
+                    // Limit the bar height to keep it above the x-axis line and below the maxYValue
+                    var xAxisY = canvas.height - gridSize;
+                    if (yPosition >= xAxisY) {
+                        // Restrict scaling below x-axis
+                        var scaleY = (xAxisY - this.top) / this.height;
+                        this.scaleY = scaleY;
+                        this.height = newHeight;
+                    } else if (newHeight <= 0) {
+                        // Prevent scaling below 0 height
+                        this.scaleY = this.height / this.height;
+                        this.height = this.height;
+                    } 
+                    // else if (newHeight >= initialBarHeight) {
+                    //     // Limit the bar height to the maxYValue
+                    //    // var scaleY = (maxYValue * gridSize) / this.height;
+                    //    var scaleY = (xAxisY) / this.height;
+                    //    // this.scaleY = scaleY;
+                    //     this.height = initialBarHeight;
+                    // }
+                    // if (this.scaleY > maxYValue) {
+                    //     this.scaleY = maxScaleY;
+                    //     this.left = this.lastGoodLeft;
+                    //     this.top = this.lastGoodTop;
+                    // }
+                    // this.lastGoodTop = this.top;
+                    // this.lastGoodLeft = this.left;
+                });
+
+
+
+
+                // Update the moving event handler to restrict movement below the x-axis line
+                bar.on('moving', function (e) {
+                    var yPosition = this.top + this.height * this.scaleY; // Consider scaling as well
+                    var xAxisY = canvas.height - gridSize;
+                    if (yPosition > xAxisY) {
+                        // Limit the bar position to keep it above the x-axis line
+                        this.top = xAxisY - this.height * this.scaleY;
+                    }
+                });
+
+                canvas.add(bar);
+            }
+
+            // Customize the selection behavior of the bars
+            canvas.on('selection:created', function (e) {
+                // Disable scaling controls for the selected bar
+                var selectedObject = e.target;
+                selectedObject.setControlsVisibility({
+                    mt: true,
+                    mb: false,
+                    tl: true,
+                    mtr: false,
+                    ml: false,
+                    bl: false,
+                    br: false,
+                    mr: false
+                });
+            });
+
+            canvas.on('selection:updated', function (e) {
+                // Disable scaling controls for the selected bar
+                var selectedObject = e.target;
+                selectedObject.setControlsVisibility({
+                    mt: true,
+                    mb: false,
+                    tl: true,
+                    mtr: false,
+                    ml: false,
+                    bl: false,
+                    br: false,
+                    mr: false
+                });
+            });
+        }
+
+        // Function to create the topRightBox
+        function createTopRightBox() {
+    // Box on the top right with label and input
+    var boxLabel = new fabric.Text('1 Unit =', {
+        left: canvas.width - 200,
+        top: 10,
+        fontSize: 16,
+        backgroundColor: 'white',
+        selectable: false
+    });
+
+    var gridSize = 50; // Default grid size
+    var inputBox = new fabric.IText('5 Divisions', {
+        left: canvas.width - 140,
+        top: gridSize - 40, // Position the input box below the first row of grids
+        width: 180,
+        fontSize: 16,
+        fill: "blue",
+        textAlign: 'center',
+        borderColor: 'green',
+        backgroundColor: 'white',
+        selectable: true, // Set selectable to true for the IText
+        editable: true, // Set editable to true for the IText
+        hasControls: false
+    });
+
+    // // Create a Fabric.js Group
+    // var group = new fabric.Group([boxLabel, inputBox], {
+    //     left: 0,
+    //     top: 0,
+    //     selectable: true, // Set selectable to true for the group
+    //     editable: true // Set editable to true for the group
+    // });
+
+    // canvas.add(group);
+    canvas.add(boxLabel);
+    canvas.add(inputBox);
+}
+
+
+
+
+
+        // Function to save the canvas as an image in jpg format
+        function saveAsImage() {
+            // Get the canvas as a data URL and create a temporary link element to trigger the download
+            var dataURL = canvas.toDataURL('image/jpeg');
+            var link = document.createElement('a');
+            link.download = 'graph.jpg';
+            link.href = dataURL;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+
+</html>

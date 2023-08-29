@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Draggable Image, Circle, Rotate, and Resize</title>
+  <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+  <!-- Include Bootstrap CSS -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <style>
+    body {
+      padding-top: 50px; /* Ensure canvas doesn't overflow on navbar */
+    }
+
+    #draggable-image {
+      display: none;
+      position: absolute;
+      z-index: 2;
+    }
+
+    #canvas-container {
+      position: relative;
+      width: 500px;
+      height: 500px;
+      margin-left: 250px;
+    }
+
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+
+    #rotate-buttons {
+      position: absolute;
+      top: 20px;
+      left: 520px;
+    }
+
+    /* Navbar styling */
+    .navbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 50px; /* Set the width of the navbar */
+      height: 100%;
+      padding: 10px;
+      background-color: #333;
+      z-index: 3; /* Ensure the navbar is on top of other elements */
+    }
+
+    .navbar .nav-item {
+      margin-bottom: 15px;
+    }
+
+    .navbar-toggler {
+      width: 100%;
+      padding: 0;
+      text-align: center;
+    }
+
+    .navbar-toggler .menu-btn {
+      display: block;
+      width: 30px;
+      height: 30px;
+      background-color: #fff;
+      cursor: pointer;
+      color: #333;
+      line-height: 30px;
+    }
+
+    .navbar-toggler .menu-content {
+      display: none;
+      margin-top: 10px;
+      background-color: #fff;
+      border: 1px solid #ccc;
+      padding: 10px;
+      width: 110px;
+    }
+
+    /* Transparent overlay for canvas */
+    .canvas-overlay {
+      display: none;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 500px;
+      height: 500px;
+      background-color: transparent;
+      z-index: 2;
+    }
+
+    .menu-open .canvas-overlay {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="navbar-toggler">
+      <div class="menu-btn"><i class="fas fa-bars"></i></div>
+      <div class="menu-content">
+        <ul class="nav flex-column">
+          <li class="nav-item">
+            <button id="showImageBtn" class="btn btn-primary"><i class="fas fa-image"></i> Show Protractor</button>
+          </li>
+          <li class="nav-item">
+            <button id="rotate-left" class="btn btn-secondary"><i class="fas fa-undo-alt"></i> Rotate Left</button>
+          </li>
+          <li class="nav-item">
+            <button id="rotate-right" class="btn btn-secondary"><i class="fas fa-redo-alt"></i> Rotate Right</button>
+          </li>
+          <li class="nav-item">
+            <button id="drawButton" class="btn btn-primary"><i class="fas fa-pencil-alt"></i> Draw</button>
+          </li>
+          <li class="nav-item">
+            <label for="image-size">Resize Protractor:</label>
+            <div id="image-size"></div>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <img id="draggable-image" src="protractor.png" alt="Draggable Image">
+
+  <div id="canvas-container">
+    <!-- Add the transparent overlay for canvas -->
+    <div class="canvas-overlay"></div>
+    <canvas id="circle-canvas" width="500" height="500"></canvas>
+    <canvas id="drawing-canvas" width="500" height="500"></canvas>
+  </div>
+
+  <!-- <label for="color-picker">Select Color:</label> -->
+  <!-- <input type="color" id="color-picker" value="#000000"> -->
+
+  <!-- Include jQuery, Bootstrap JS, and Font Awesome -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/js/all.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+  <script>
+    var isDraw = 0;
+    var drawColor = '#000';
+    var clickedPoints = [];
+    var drawnLines = [];
+
+    $(document).ready(function () {
+      // Hamburger menu functionality
+      $('.navbar-toggler .menu-btn').click(function () {
+        $('.navbar-toggler .menu-content').slideToggle();
+      });
+
+      // Show the image when the button is clicked
+      $('#showImageBtn').click(function () {
+        $('#draggable-image').toggle();
+      });
+
+      // Make the image draggable
+      $('#draggable-image').draggable();
+
+      // Draw the circle and radius line on the canvas
+      const canvas = document.getElementById('circle-canvas');
+      const context = canvas.getContext('2d');
+
+      // Draw the circle
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      const radius = 250;
+      context.beginPath();
+      context.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+      context.stroke();
+
+      // Draw the radius line
+      context.moveTo(centerX, centerY);
+      context.lineTo(centerX + radius, centerY);
+      context.stroke();
+
+      // Image resizing using slider
+      $('#image-size').slider({
+        range: 'min',
+        min: 50,
+        max: 200,
+        value: 100,
+        slide: function (event, ui) {
+          const scale = ui.value / 100;
+          const rotation = $('#draggable-image').data('rotation') || 0;
+          $('#draggable-image').css({
+            transform: 'rotate(' + rotation + 'deg) scale(' + scale + ')'
+          });
+        }
+      });
+
+      // Image rotation buttons
+      $('#rotate-left').click(function () {
+        rotateImage(-15);
+      });
+
+      $('#rotate-right').click(function () {
+        rotateImage(15);
+      });
+
+      function rotateImage(degrees) {
+        const currentRotation = $('#draggable-image').data('rotation') || 0;
+        const newRotation = currentRotation + degrees;
+        $('#draggable-image').css({
+          transform: 'rotate(' + newRotation + 'deg) scale(' + ($('#image-size').slider('value') / 100) + ')'
+        });
+        $('#draggable-image').data('rotation', newRotation);
+      }
+
+      let isDrawing = false;
+      let lastX = 0;
+      let lastY = 0;
+
+      // Get the drawing canvas
+      const drawingCanvas = document.getElementById('drawing-canvas');
+      const drawingContext = drawingCanvas.getContext('2d');
+
+      // Function to handle mouse down event (start drawing)
+      function startDrawing(e) {
+        isDrawing = true;
+        lastX = e.offsetX;
+        lastY = e.offsetY;
+      }
+
+      // Function to handle mouse move event (drawing)
+      function draw(e) {
+        if (!isDrawing || !isDraw) return;
+        const drawingCanvas = document.getElementById('drawing-canvas');
+        const drawingContext = drawingCanvas.getContext('2d');
+        const canvasOffset = $('#canvas-container').offset();
+        const centerX = drawingCanvas.width / 2;
+        const centerY = drawingCanvas.height / 2;
+        const currentX = e.pageX - canvasOffset.left;
+        const currentY = e.pageY - canvasOffset.top;
+
+        drawingContext.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+        drawingContext.strokeStyle = drawColor; // Set the stroke color
+        drawingContext.lineWidth = 2; // Set the line width
+        drawingContext.beginPath();
+        drawingContext.moveTo(centerX, centerY);
+        drawingContext.lineTo(currentX, currentY);
+        drawingContext.stroke();
+      }
+
+      // Function to handle mouse up event (stop drawing)
+      function stopDrawing() {
+        isDrawing = false;
+      }
+
+      // Add event listeners to the drawing canvas for drawing
+      $(drawingCanvas).on('mousedown', startDrawing);
+      $(drawingCanvas).on('mousemove', draw);
+      $(drawingCanvas).on('mouseup', stopDrawing);
+      $(drawingCanvas).on('mouseout', stopDrawing);
+
+      function addPoint(e) {
+        if (!isDraw) return;
+        const canvasOffset = $('#canvas-container').offset();
+        const currentX = e.pageX - canvasOffset.left;
+        const currentY = e.pageY - canvasOffset.top;
+        clickedPoints.push({ x: currentX, y: currentY });
+        drawLines(); // Call the drawLines function to update the lines being drawn
+      }
+
+      function drawLines() {
+        if (!isDraw) return;
+        const drawingCanvas = document.getElementById('drawing-canvas');
+        const drawingContext = drawingCanvas.getContext('2d');
+        const centerX = drawingCanvas.width / 2;
+        const centerY = drawingCanvas.height / 2;
+
+        drawingContext.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+
+        // Draw previously drawn lines
+        drawingContext.strokeStyle = drawColor;
+        drawingContext.lineWidth = 2;
+
+        drawnLines.forEach(line => {
+          drawingContext.beginPath();
+          drawingContext.moveTo(centerX, centerY);
+          drawingContext.lineTo(line.x, line.y);
+          drawingContext.stroke();
+        });
+
+        // Draw current line being drawn
+        if (clickedPoints.length > 0) {
+          drawingContext.beginPath();
+          drawingContext.moveTo(centerX, centerY);
+          drawingContext.lineTo(clickedPoints[clickedPoints.length - 1].x, clickedPoints[clickedPoints.length - 1].y);
+          drawingContext.stroke();
+        }
+      }
+
+      $('#drawing-canvas').on('click', addPoint);
+
+      $('#drawButton').on('click', function () {
+        isDraw = !isDraw;
+        $('#draggable-image').draggable(isDraw ? 'disable' : 'enable');
+        const zIndex = isDraw ? 3 : 1;
+        $('canvas').css('z-index', zIndex);
+
+        // Clear the array of clicked points when entering draw mode
+        if (isDraw) {
+          clickedPoints = [];
+        } else {
+          // Store the current line in drawnLines array when toggling off draw mode
+          if (clickedPoints.length > 0) {
+            drawnLines.push(...clickedPoints);
+            clickedPoints = [];
+          }
+        }
+
+        drawLines();
+      });
+
+      // Function to draw lines from the center of the circle to each clicked point
+      function drawLines() {
+        if (!isDraw) return;
+        const drawingCanvas = document.getElementById('drawing-canvas');
+        const drawingContext = drawingCanvas.getContext('2d');
+        const centerX = drawingCanvas.width / 2;
+        const centerY = drawingCanvas.height / 2;
+
+        drawingContext.strokeStyle = drawColor;
+        drawingContext.lineWidth = 2;
+
+        clickedPoints.forEach(point => {
+          drawingContext.beginPath();
+          drawingContext.moveTo(centerX, centerY);
+          drawingContext.lineTo(point.x, point.y);
+          drawingContext.stroke();
+        });
+      }
+    });
+  </script>
+
+</body>
+</html>

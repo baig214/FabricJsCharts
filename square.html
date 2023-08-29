@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Straight Line Drawing with Grid and Undo</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+    }
+
+    #canvas {
+      border: 0px solid black;
+      cursor: crosshair;
+      margin-left: 30%;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas" width="500" height="500"></canvas>
+  <button id="saveButton">Save as Image</button>
+  <div>
+  <p>NOTE: Keypress "U" to undo</p>
+  </div>
+  <script>
+    // Get the canvas element and its context
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const gridSize = 15;
+    const cellSize = canvas.width / (gridSize - 1);
+
+    let isDrawing = false;
+    let lines = []; // Array to store all lines
+    let currentLine = null; // Variable to hold the current line being drawn
+
+    // Function to draw a grid of dots and return an array of grid points
+    function drawGrid() {
+      const dotSize = 2;
+      const customPadding = -10; // Custom padding between two points
+      const gridPoints = [];
+
+      for (let x = 0; x < gridSize; x++) {
+        for (let y = 0; y < gridSize; y++) {
+          const dotX = x * cellSize + customPadding / 2;
+          const dotY = y * cellSize + customPadding / 2;
+          ctx.beginPath();
+          ctx.arc(dotX, dotY, dotSize, 0, Math.PI * 2);
+          ctx.fillStyle = '#000';
+          ctx.fill();
+          gridPoints.push({ x: dotX, y: dotY });
+        }
+      }
+
+      return gridPoints;
+    }
+
+    // Function to snap the point to the nearest grid point
+    function snapToGrid(point, gridPoints) {
+      let minDistance = Number.MAX_VALUE;
+      let snappedPoint = null;
+
+      for (const gridPoint of gridPoints) {
+        const distance = Math.hypot(point.x - gridPoint.x, point.y - gridPoint.y);
+        if (distance < minDistance) {
+          minDistance = distance;
+          snappedPoint = gridPoint;
+        }
+      }
+
+      return snappedPoint;
+    }
+
+    // Function to adjust mouse coordinates based on canvas position
+    function getMouseCoordinates(event) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top,
+      };
+    }
+
+    // Event listener for mouse down
+    canvas.addEventListener('mousedown', (e) => {
+      const gridPoints = drawGrid();
+      const clickedPoint = snapToGrid(getMouseCoordinates(e), gridPoints);
+      isDrawing = true;
+      currentLine = { start: { ...clickedPoint }, end: { ...clickedPoint } };
+    });
+
+    // Event listener for mouse up
+    canvas.addEventListener('mouseup', (e) => {
+      if (isDrawing) {
+        const gridPoints = drawGrid();
+        const clickedPoint = snapToGrid(getMouseCoordinates(e), gridPoints);
+        currentLine.end = { ...clickedPoint };
+        lines.push(currentLine); // Save the completed line to the array
+        currentLine = null; // Reset the current line
+        drawAllLines(); // Redraw all lines to ensure dots are not covered
+      }
+    });
+
+    // Event listener for mouse move
+    canvas.addEventListener('mousemove', (e) => {
+      if (!isDrawing) return;
+
+      const gridPoints = drawGrid();
+      const currentPoint = snapToGrid(getMouseCoordinates(e), gridPoints);
+
+      // Clear the canvas and redraw all lines and grid
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawGrid();
+      drawAllLines(); // Redraw all lines to ensure dots are not covered
+
+      // Draw the current line being drawn
+      ctx.beginPath();
+      ctx.moveTo(currentLine.start.x, currentLine.start.y);
+      ctx.lineTo(currentPoint.x, currentPoint.y);
+      ctx.stroke();
+    });
+
+    // Function to draw all lines in the array
+    function drawAllLines() {
+      for (const line of lines) {
+        ctx.beginPath();
+        ctx.moveTo(line.start.x, line.start.y);
+        ctx.lineTo(line.end.x, line.end.y);
+        ctx.stroke();
+      }
+    }
+
+    // Function to undo the last line
+    function undoLine() {
+      if (lines.length > 0) {
+        lines.pop(); // Remove the last line from the array
+        // Clear the canvas and redraw all lines and grid
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawGrid();
+        drawAllLines(); // Redraw all remaining lines to ensure dots are not covered
+      }
+    }
+
+    // Add event listener for the 'u' key to trigger line undo
+    document.addEventListener('keypress', (e) => {
+      if (e.key === 'u') {
+        undoLine();
+      }
+    });
+
+    // Initial drawing of the grid
+    drawGrid();
+
+   // Function to save the canvas as an image with margins
+function saveCanvasAsImageWithMargins() {
+  const margin = 20; // Adjust the margin size as needed
+  const newCanvas = document.createElement('canvas');
+  const newCtx = newCanvas.getContext('2d');
+
+  // Set the dimensions of the new canvas with margins
+  newCanvas.width = canvas.width + margin * 2;
+  newCanvas.height = canvas.height + margin * 2;
+
+  // Fill the new canvas with a white background (adjust the color as needed)
+  newCtx.fillStyle = '#fff';
+  newCtx.fillRect(0, 0, newCanvas.width, newCanvas.height);
+
+  // Draw the original canvas content onto the new canvas with margins
+  newCtx.drawImage(canvas, margin, margin);
+
+  // Create a temporary anchor element for download
+  const downloadLink = document.createElement('a');
+  downloadLink.setAttribute('download', 'canvas_image.png');
+  downloadLink.setAttribute('href', newCanvas.toDataURL("image/png").replace("image/png", "image/octet-stream"));
+  downloadLink.click();
+}
+
+// Event listener for the save button
+document.getElementById('saveButton').addEventListener('click', () => {
+  saveCanvasAsImageWithMargins();
+});
+
+  </script>
+</body>
+</html>

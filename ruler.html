@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Canvas Drawing with Image Ruler</title>
+<link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+<style>
+ #canvas-container {
+    position: relative;
+    width: 500px;
+    height: 500px;
+  }
+  #draggable-image{
+    z-index: 3;
+  }
+  #drawing-canvas, #image-canvas {
+    position: absolute;
+    border: 1px solid #000;
+    top: 0;
+    left: 0;
+  }
+
+  canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+  }
+  .canvas-overlay {
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 500px;
+    height: 500px;
+    background-color: transparent;
+    z-index: 2;
+  }
+</style>
+</head>
+<body>
+  <div id="canvas-container">
+    <div class="canvas-overlay"></div>
+    <canvas id="drawing-canvas"></canvas>
+  </div>
+  <img id="draggable-image" src="ruler20cms.png" alt="Ruler">
+  <button id="toggle-image-button">Drag Ruler</button>
+  <button id="hide-image-button">Hide/Show Ruler</button>
+  <button id="rotate-image-button">Rotate Ruler</button>
+  <button id="undo-button">Undo</button>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+  <script>
+    $(document).ready(function() {
+      var imageRotation = 0;
+      var isImageDraggable = true;
+      var isImageVisible = false;
+      $('#draggable-image').draggable({ containment: 'parent' });
+
+      $('#toggle-image-button').click(function() {
+        if (isImageDraggable) {
+          $('#draggable-image').draggable('disable');
+          isImageDraggable = false;
+        } else {
+          $('#draggable-image').draggable('enable');
+          isImageDraggable = true;
+        }
+      });
+
+      $('#hide-image-button').click(function() {
+        $('#draggable-image').toggle();
+      });
+
+      $('#rotate-image-button').click(function() {
+        imageRotation += 45;
+        $('#draggable-image').css('transform', 'rotate(' + imageRotation + 'deg)');
+      });
+
+      var drawingCanvas = document.getElementById('drawing-canvas');
+      var drawingContext = drawingCanvas.getContext('2d');
+      drawingCanvas.width = 500;
+      drawingCanvas.height = 500;
+      
+      var isDrawing = false;
+      var line = []; // Store the current line being drawn
+      var lineSegments = []; // Store all line segments
+
+      drawingCanvas.addEventListener('mousedown', (e) => {
+        if (!e.shiftKey) {
+          isDrawing = true;
+          line = [{ x: e.offsetX, y: e.offsetY }];
+        }
+      });
+
+      drawingCanvas.addEventListener('mousemove', (e) => draw(e));
+      drawingCanvas.addEventListener('mouseup', (e) => {
+        if (isDrawing) {
+          isDrawing = false;
+          line.push({ x: e.offsetX, y: e.offsetY });
+          lineSegments.push(line);
+          line = []; // Clear the current line
+        }
+      });
+      drawingCanvas.addEventListener('mouseout', (e) => {
+        if (isDrawing) {
+          isDrawing = false;
+          line.push({ x: e.offsetX, y: e.offsetY });
+          lineSegments.push(line);
+          line = []; // Clear the current line
+        }
+      });
+
+      function draw(e) {
+        if (!isDrawing) return;
+        drawingContext.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+
+        // Draw existing line segments
+        lineSegments.forEach(segment => {
+          drawingContext.beginPath();
+          drawingContext.moveTo(segment[0].x, segment[0].y);
+          for (let i = 1; i < segment.length; i++) {
+            drawingContext.lineTo(segment[i].x, segment[i].y);
+          }
+          drawingContext.stroke();
+          drawingContext.closePath();
+        });
+
+        // Draw current line being drawn
+        drawingContext.beginPath();
+        drawingContext.moveTo(line[0].x, line[0].y);
+        drawingContext.lineTo(e.offsetX, e.offsetY);
+        drawingContext.stroke();
+        drawingContext.closePath();
+      }
+
+      $('#undo-button').click(function() {
+      lineSegments.pop(); // Remove the last drawn line segment
+      redrawCanvas(); // Redraw the canvas without the removed line segment
+    });
+
+    function redrawCanvas() {
+      drawingContext.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+
+      // Draw existing line segments
+      lineSegments.forEach(segment => {
+        drawingContext.beginPath();
+        drawingContext.moveTo(segment[0].x, segment[0].y);
+        for (let i = 1; i < segment.length; i++) {
+          drawingContext.lineTo(segment[i].x, segment[i].y);
+        }
+        drawingContext.stroke();
+        drawingContext.closePath();
+      });
+    }
+    });
+  </script>
+</body>
+</html>
