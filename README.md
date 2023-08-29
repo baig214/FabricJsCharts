@@ -35,10 +35,10 @@ Feel free to experiment, tweak parameters, and enhance the code to suit your nee
 ## Chart Types
 This repository includes code for the following interactive chart types:
 
-Line Chart: Create line charts on virtual graph paper.
-Bar Chart: Build dynamic bar charts to visualize data.
-Venn Chart : Build Movable venn diagrams.
-Pie chart : Pie chart with protractor and ruler.
+### Line Chart: Create line charts on virtual graph paper.
+### Bar Chart: Build dynamic bar charts to visualize data.
+### Venn Chart : Build Movable venn diagrams.
+### Pie chart : Pie chart with protractor and ruler.
 
 ## Contributing
 Contributions are welcome! If you'd like to contribute to this repository, feel free to open issues, submit pull requests, or suggest improvements. Please follow the existing code style and guidelines when submitting contributions.
